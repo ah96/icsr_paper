@@ -6,18 +6,6 @@ This repository contains the supplementary material for the ICSR 2026 paper:
 
 The repository provides the simulation code, RDDL library-domain model, generated evaluation outputs, and user-study materials used for the camera-ready version of the paper. The central scenario is a social robot librarian that must decide how to communicate with library visitors under uncertain and user-dependent preferences.
 
-## Recommended repository name
-
-**`adaptive-social-robot-explanations`**
-
-This name is more descriptive than `icsr_repository`, remains understandable outside the conference context, and captures the core contribution: adaptive explanation selection for social robots.
-
-Alternative shorter names:
-
-- `adaptive-robot-explanations`
-- `social-robot-explanation-selection`
-- `adaptive-explanation-selection`
-
 ## Repository structure
 
 ```text
