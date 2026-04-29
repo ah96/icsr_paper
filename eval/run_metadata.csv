@@ -1,0 +1,10 @@
+parameter,value
+T,300
+runs,30
+seed,42
+cost_explain,0.15
+cost_update,0.05
+cost_silent,0.0
+switch_prob,0.03
+switch_mode,toggle
+dynamic_pair,Type1_ExplanationOriented+Type2_Minimalist

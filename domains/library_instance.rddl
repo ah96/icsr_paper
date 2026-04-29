@@ -1,0 +1,59 @@
+non-fluents nf_library {
+	domain = library;
+        objects {
+                robot: {tiago};
+		human: {visitor_1, visitor_2};
+                book: {book_1, book_2};
+                waypoint: {registration_desk, reading_space_1, reading_space_2, bookshelf_space, social_room};
+	};
+	
+	non-fluents {
+	        // visitors
+                human_at(visitor_1, reading_space_1);
+                human_at(visitor_2, reading_space_2);
+
+                wants_book(visitor_1, book_1);
+                wants_book(visitor_2, book_2);
+
+                // visitor_1
+                expl_prob(visitor_1) = 1.0;                
+                // modality
+                visual_modality_prob(visitor_1) = 0.4;
+                textual_modality_prob(visitor_1) = 0.6;
+                // scope
+                local_scope_prob(visitor_1) = 0.1;
+                global_scope_prob(visitor_1) = 0.9;
+                // detail level
+                summary_detail_prob(visitor_1) = 0.7;
+                narrative_detail_prob(visitor_1) = 0.3;
+                
+                // visitor_2
+                expl_prob(visitor_2) = 0.0;
+                // modality                
+                visual_modality_prob(visitor_2) = 0.6;
+                textual_modality_prob(visitor_2) = 0.4;
+                // scope
+                local_scope_prob(visitor_2) = 0.9;
+                global_scope_prob(visitor_2) = 0.1;
+                // detail level
+                summary_detail_prob(visitor_2) = 0.3;
+                narrative_detail_prob(visitor_2) = 0.7;
+	};
+}
+
+instance library_instance {
+	domain = library;
+	non-fluents = nf_library;
+	
+        init-state {
+                robot_at(tiago, registration_desk);
+
+                // books
+                book_at(book_1, bookshelf_space);
+                book_at(book_2, bookshelf_space);
+	};
+
+	max-nondef-actions = 1;
+	horizon  = 30;
+	discount = 1.0;
+}

@@ -1,0 +1,249 @@
+    // How to run prost
+    // ./run-server.py -b benchmarks/library/
+    // ./prost.py library_instance "[Prost -s 1 -se [IPC2014]]"
+
+    domain library {
+        
+        types {
+            human: object;
+            robot: object;
+            book: object;
+            waypoint: object;
+        };
+
+        pvariables {
+            //////////////////////////////////////////////////////////////////////////////////////////
+            // Non-fluents        
+            human_at(human, waypoint): { non-fluent, bool, default = false };
+            wants_book(human, book): { non-fluent, bool, default = false };
+        
+            // human preferences (probabilities)
+            expl_prob(human): { non-fluent, real, default = 0.5 };
+
+            // modality
+            visual_modality_prob(human): { non-fluent, real, default = 0.5 };
+            textual_modality_prob(human): { non-fluent, real, default = 0.5 };
+
+            // scope
+            local_scope_prob(human): { non-fluent, real, default = 0.5 };
+            global_scope_prob(human): { non-fluent, real, default = 0.5 };
+
+            // detail level
+            summary_detail_prob(human): { non-fluent, real, default = 0.5 };
+            narrative_detail_prob(human): { non-fluent, real, default = 0.5 };
+            
+            //////////////////////////////////////////////////////////////////////////////////////////
+            // State fluents
+            // robot at a certain waypoint
+            robot_at(robot, waypoint): { state-fluent, bool, default = false };
+
+            // book at a certain waypoint
+            book_at(book, waypoint): { state-fluent, bool, default = false };
+
+            // human detected by the robot
+            human_detected(human, robot): { state-fluent, bool, default = false };
+
+            // human approached by the robot
+            human_approached(human, robot): { state-fluent, bool, default = false };
+
+            // human asked robot for a book
+            asked_for_book(human, robot, book): { state-fluent, bool, default = false };
+
+            // robot holds a book or not
+            holds_any_book(robot): { state-fluent, bool, default = false };
+            holds_a_book(robot, book, human): { state-fluent, bool, default = false };
+
+            // goal_reached state variable
+            goal_reached: { state-fluent, bool, default = false };
+            
+            // chosen preferences
+            chosen_modality(robot, human, book): { state-fluent, bool, default = false };
+            chosen_scope(robot, human, book): { state-fluent, bool, default = false };
+            chosen_detail(robot, human, book): { state-fluent, bool, default = false };
+
+            // whether robot explained to a human
+            explanation_planning_started(robot, human, book): { state-fluent, bool, default = false };
+            explanation_planning_ended(robot, human, book): { state-fluent, bool, default = false };
+            explained(robot, human, book): { state-fluent, bool, default = false };
+
+            // human response preference variables = Bernoulli(respective_probability)
+            explanation_wanted(human): { state-fluent, bool, default = false };
+            modality_visual_wanted(human): { state-fluent, bool, default = false };
+            modality_textual_wanted(human): { state-fluent, bool, default = false };
+            scope_local_wanted(human): { state-fluent, bool, default = false };
+            scope_global_wanted(human): { state-fluent, bool, default = false };
+            detail_summary_wanted(human): { state-fluent, bool, default = false };
+            detail_narrative_wanted(human): { state-fluent, bool, default = false };
+
+            // robot delivered a book to a human
+            delivered_book(robot, book, human): { state-fluent, bool, default = false };
+            
+            //////////////////////////////////////////////////////////////////////////////////////////
+            // Action fluents
+            // robot from w1 to w2
+            goto_waypoint(robot, waypoint, waypoint): { action-fluent, bool, default = false }; 
+
+            // robot detects a human
+            detect_human(robot, human): { action-fluent, bool, default = false };
+
+            // robot approaches a human
+            approach_human(robot, human): { action-fluent, bool, default = false };
+
+            // human asks robot for a book
+            ask_for_book(human, robot, book): { action-fluent, bool, default = false };
+
+            // robot fetches a book
+            fetch_book(robot, book, human): { action-fluent, bool, default = false };
+
+            // start explanation planning
+            start_explanation_planning(robot, human, book): { action-fluent, bool, default = false };
+
+            // actions for personalizing explanations based on modality preferences
+            choose_visual_modality(robot, human, book): { action-fluent, bool, default = false };
+            choose_textual_modality(robot, human, book): { action-fluent, bool, default = false };
+
+            // actions for personalizing explanations based on scope preferences
+            choose_local_scope(robot, human, book): { action-fluent, bool, default = false };
+            choose_global_scope(robot, human, book): { action-fluent, bool, default = false };
+
+            // actions for personalizing explanations based on detail level preferences
+            choose_summary_detail(robot, human, book): { action-fluent, bool, default = false };
+            choose_narrative_detail(robot, human, book): { action-fluent, bool, default = false };
+
+            // end explanation planning
+            end_explanation_planning(robot, human, book): { action-fluent, bool, default = false };
+
+            // explain
+            explain(robot, human, book): { action-fluent, bool, default = false };
+
+            // robot delivers a book to a human after explanations
+            deliver_book(robot, book, human): { action-fluent, bool, default = false };
+
+            // robot delivers a book to a human without explanation
+            deliver_book_without_explanation(robot, book, human): { action-fluent, bool, default = false };
+        };
+
+        cpfs {
+            // robot at a certain waypoint
+            // propagation of state fluents
+            robot_at'(?r, ?w) = if (exists_{?w1: waypoint} (goto_waypoint(?r, ?w1, ?w))) then true 
+                                else if (exists_{?w1: waypoint} (goto_waypoint(?r, ?w, ?w1))) then false
+                                else robot_at(?r, ?w);
+
+            book_at'(?b, ?w) = if (exists_{?r:robot, ?h:human} [ fetch_book(?r, ?b, ?h) ]) then false
+                                else book_at(?b, ?w);
+    
+            // human detected by the robot
+            human_detected'(?h, ?r) = if ( detect_human(?r, ?h) ) then true 
+                                else if ( exists_{?b: book} [ fetch_book(?r, ?b, ?h) ] ) then false
+                                else human_detected(?h, ?r);
+
+            // human approached by the robot
+            human_approached'(?h, ?r) = if ( approach_human(?r, ?h) ) then true 
+                                else if ( exists_{?b: book} [ fetch_book(?r, ?b, ?h) | deliver_book(?r, ?b, ?h) | deliver_book_without_explanation(?r, ?b, ?h) ] ) then false
+                                else human_approached(?h, ?r); 
+
+            // human asked robot for a book
+            asked_for_book'(?h, ?r, ?b) = ask_for_book(?h, ?r, ?b) | asked_for_book(?h, ?r, ?b);
+
+            // robot holds any book
+            holds_any_book'(?r) = if ( exists_{?h: human, ?b: book} [ fetch_book(?r, ?b, ?h) ] ) then true 
+                                else if ( exists_{?h: human, ?b: book} [ deliver_book(?r, ?b, ?h) | deliver_book_without_explanation(?r, ?b, ?h) ] ) then false
+                                else holds_any_book(?r);
+
+            // robot holds a book
+            holds_a_book'(?r, ?b, ?h) = if ( fetch_book(?r, ?b, ?h) ) then true 
+                                else if ( deliver_book(?r, ?b, ?h) | deliver_book_without_explanation(?r, ?b, ?h) ) then false
+                                else holds_a_book(?r, ?b, ?h);
+
+            // goal_reached state variable
+            goal_reached' = ( forall_{?h: human} [ exists_{?r: robot, ?b: book} [ delivered_book(?r, ?b, ?h) ] ] ) | goal_reached;
+            
+            // chosen preferences
+            chosen_modality'(?r, ?h, ?b) = choose_visual_modality(?r, ?h, ?b) | choose_textual_modality(?r, ?h, ?b) | chosen_modality(?r, ?h, ?b);
+            chosen_scope'(?r, ?h, ?b) = choose_local_scope(?r, ?h, ?b) | choose_global_scope(?r, ?h, ?b) | chosen_scope(?r, ?h, ?b);
+            chosen_detail'(?r, ?h, ?b) = choose_summary_detail(?r, ?h, ?b) | choose_narrative_detail(?r, ?h, ?b) | chosen_detail(?r, ?h, ?b);
+
+            // whether robot explained to a human
+            explanation_planning_started'(?r, ?h, ?b) = start_explanation_planning(?r, ?h, ?b) | explanation_planning_started(?r, ?h, ?b);
+            explanation_planning_ended'(?r, ?h, ?b) = end_explanation_planning(?r, ?h, ?b) | explanation_planning_ended(?r, ?h, ?b);
+            explained'(?r, ?h, ?b) = explain(?r, ?h, ?b) | explained(?r, ?h, ?b);
+
+            // robot delivered a book to a human
+            delivered_book'(?r, ?b, ?h) = deliver_book(?r, ?b, ?h) | deliver_book_without_explanation(?r, ?b, ?h) | delivered_book(?r, ?b, ?h);
+
+            // human preference variables = Bernoulli(respective_probability)
+            explanation_wanted'(?h) = Bernoulli(expl_prob(?h));
+            modality_visual_wanted'(?h) = Bernoulli(visual_modality_prob(?h));
+            modality_textual_wanted'(?h) = Bernoulli(textual_modality_prob(?h));
+            scope_local_wanted'(?h) = Bernoulli(local_scope_prob(?h));
+            scope_global_wanted'(?h) = Bernoulli(global_scope_prob(?h));
+            detail_summary_wanted'(?h) = Bernoulli(summary_detail_prob(?h));
+            detail_narrative_wanted'(?h) = Bernoulli(narrative_detail_prob(?h));
+        };
+
+        action-preconditions {
+            // A robot must be in a position to move to another
+            forall_{?r: robot, ?wf: waypoint, ?wt: waypoint} [goto_waypoint(?r, ?wf, ?wt) => ( ~goal_reached ^ robot_at(?r, ?wf) ) ]; // ^ forall_{?h: human} [ ~human_detected(?h, ?r) ^ ~human_approached(?h, ?r) ]
+
+            // A robot can not move to its current position
+            forall_{?r: robot, ?wf: waypoint, ?wt: waypoint} [goto_waypoint(?r, ?wf, ?wt) => ( ~goal_reached ^ ?wf ~= ?wt )];
+
+            // A robot can not be in two places at the same time
+            forall_{?r: robot, ?w1: waypoint, ?w2: waypoint} [ ?w1 == ?w2 | (robot_at(?r, ?w1) => ~robot_at(?r, ?w2)) ];
+
+            // To be able to detect a human, the robot and the human must be in the same waypoint
+            forall_{?r: robot, ?h: human} [detect_human(?r, ?h) => ( ~goal_reached ^ exists_{?w: waypoint} [ human_at(?h, ?w) ^ robot_at(?r, ?w) ] ^ ~holds_any_book(?r) ) ];
+
+            // To approach a human, the robot must have detected them
+            forall_{?r: robot, ?h: human} [approach_human(?r, ?h) => ( ~goal_reached ^ human_detected(?h, ?r) ^ exists_{?w: waypoint} [ human_at(?h, ?w) ^ robot_at(?r, ?w)] ) ];
+
+            // To ask robot for a book, the robot must have approached the human
+            forall_{?r: robot, ?h: human, ?b: book} [ask_for_book(?h, ?r, ?b) => ( ~goal_reached ^ human_approached(?h, ?r) ^ wants_book(?h, ?b) ^ ~holds_any_book(?r) ^ exists_{?w: waypoint} [ human_at(?h, ?w) ^ robot_at(?r, ?w) ] ) ];
+
+            // To fetch a book for a human, the human must have asked the robot for the book
+            forall_{?r: robot, ?b: book, ?h: human} [fetch_book(?r, ?b, ?h) => ( ~goal_reached ^ asked_for_book(?h, ?r, ?b) ^ ~holds_any_book(?r) ^ ~holds_a_book(?r, ?b, ?h) ^ exists_{?w: waypoint} [ book_at(?b, ?w) ^ robot_at(?r, ?w) ] ) ];
+
+            // Start explanation planning
+            forall_{?r: robot, ?h: human, ?b: book} [start_explanation_planning(?r, ?h, ?b) => ( ~goal_reached ^ holds_a_book(?r, ?b, ?h) ^ holds_any_book(?r) ^ asked_for_book(?h, ?r, ?b) ^ explanation_wanted(?h) ^ ~explained(?r, ?h, ?b) ^ exists_{?w: waypoint} [robot_at(?r, ?w) ^ human_at(?h, ?w)])]; 
+
+            // Choose visual modality
+            forall_{?r: robot, ?h: human, ?b: book} [choose_visual_modality(?r, ?h, ?b) => ( ~goal_reached ^ explanation_planning_started(?r, ?h, ?b) ^ modality_visual_wanted(?h) ^ ~chosen_modality(?r, ?h, ?b) ^ exists_{?w: waypoint} [robot_at(?r, ?w) ^ human_at(?h, ?w)])];
+            
+            // Choose textual modality
+            forall_{?r: robot, ?h: human, ?b: book} [choose_textual_modality(?r, ?h, ?b) => ( ~goal_reached ^ explanation_planning_started(?r, ?h, ?b) ^ modality_textual_wanted(?h) ^ ~chosen_modality(?r, ?h, ?b) ^ exists_{?w: waypoint} [robot_at(?r, ?w) ^ human_at(?h, ?w)])];
+
+            // Choose local scope
+            forall_{?r: robot, ?h: human, ?b: book} [choose_local_scope(?r, ?h, ?b) => ( ~goal_reached ^ explanation_planning_started(?r, ?h, ?b) ^ scope_local_wanted(?h) ^ chosen_modality(?r, ?h, ?b) ^ ~chosen_scope(?r, ?h, ?b) ^ exists_{?w: waypoint} [robot_at(?r, ?w) ^ human_at(?h, ?w)])];
+
+            // Choose global scope        
+            forall_{?r: robot, ?h: human, ?b: book} [choose_global_scope(?r, ?h, ?b) => ( ~goal_reached ^ explanation_planning_started(?r, ?h, ?b) ^ scope_global_wanted(?h) ^ chosen_modality(?r, ?h, ?b) ^ ~chosen_scope(?r, ?h, ?b) ^ exists_{?w: waypoint} [robot_at(?r, ?w) ^ human_at(?h, ?w)])];
+
+            // Choose summary as detail level 
+            forall_{?r: robot, ?h: human, ?b: book} [choose_summary_detail(?r, ?h, ?b) => ( ~goal_reached ^ explanation_planning_started(?r, ?h, ?b) ^ detail_summary_wanted(?h) ^ chosen_modality(?r, ?h, ?b) ^ chosen_scope(?r, ?h, ?b) ^ ~chosen_detail(?r, ?h, ?b) ^ exists_{?w: waypoint} [robot_at(?r, ?w) ^ human_at(?h, ?w)])];
+            
+            // Choose narrative as detail level
+            forall_{?r: robot, ?h: human, ?b: book} [choose_narrative_detail(?r, ?h, ?b) => ( ~goal_reached ^ explanation_planning_started(?r, ?h, ?b) ^ detail_narrative_wanted(?h) ^ chosen_modality(?r, ?h, ?b) ^ chosen_scope(?r, ?h, ?b) ^ ~chosen_detail(?r, ?h, ?b) ^ exists_{?w: waypoint} [robot_at(?r, ?w) ^ human_at(?h, ?w)])];
+            
+            // End explanation planning
+            forall_{?r: robot, ?h: human, ?b: book} [end_explanation_planning(?r, ?h, ?b) => ( ~goal_reached ^ explanation_planning_started(?r, ?h, ?b) ^ chosen_modality(?r, ?h, ?b) ^ chosen_scope(?r, ?h, ?b) ^ chosen_detail(?r, ?h, ?b) ^ exists_{?w: waypoint} [robot_at(?r, ?w) ^ human_at(?h, ?w)])];
+
+            // Explain
+            forall_{?r: robot, ?h: human, ?b: book} [explain(?r, ?h, ?b) => ( ~goal_reached ^ explanation_planning_ended(?r, ?h, ?b) ^ ~explained(?r, ?h, ?b) ^ exists_{?w: waypoint} [robot_at(?r, ?w) ^ human_at(?h, ?w)])];
+
+            // Deliver a book to a human after the explanation
+            forall_{?r: robot, ?h: human, ?b: book} [deliver_book(?r, ?b, ?h) => ( ~goal_reached ^ holds_a_book(?r, ?b, ?h) ^ holds_any_book(?r) ^ explained(?r, ?h, ?b) ^ exists_{?w: waypoint} [robot_at(?r, ?w) ^ human_at(?h, ?w)])];
+
+            // Deliver a book to a human without the explanation
+            forall_{?r: robot, ?h: human, ?b: book} [deliver_book_without_explanation(?r, ?b, ?h) => ( ~goal_reached ^ holds_a_book(?r, ?b, ?h) ^ holds_any_book(?r) ^ asked_for_book(?h, ?r, ?b) ^ ~explanation_wanted(?h) ^ exists_{?w: waypoint} [robot_at(?r, ?w) ^ human_at(?h, ?w)])];
+        };
+
+        // Reward
+        reward = if ( 
+            forall_{?h: human} [ 
+                exists_{?r: robot, ?b: book} [ 
+                    delivered_book(?r, ?b, ?h) 
+                    ] ] ) then 10
+            else -10000;
+
+    }

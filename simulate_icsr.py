@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ICSR 2026 illustrative simulation: explanation strategy selection under uncertain human response.
+ICSR 2026 paper "Adaptive Explanation Strategy Selection Under Uncertain Human Responses in Social Robotics" simulation: explanation strategy selection under uncertain human response.
 
 - Situations: Delay, Failure, Reordering
 - Actions: Explain, Update, Silent
@@ -12,16 +12,17 @@ Outputs:
 - results/*.csv (per user type, per policy aggregated over runs)
 - figures/*.pdf
 
-Baseline (Types 1-3 only):
-python3 simulate_icsr.py --outdir out_icsr_static --T 300 --runs 30 --seed 42
 
-Dynamic preference regime (add Type 4):
+- How to run evaluation:
 python3 simulate_icsr.py \
-  --outdir out_icsr_dynamic \
+  --outdir eval \
   --T 300 --runs 30 --seed 42 \
   --switch_prob 0.03 \
   --switch_mode toggle \
-  --dynamic_pair Type1_ExplanationOriented+Type2_Minimalist
+  --dynamic_pair Type1_ExplanationOriented+Type2_Minimalist \
+  --cost_explain 0.15 \
+  --cost_update 0.05 \
+  --cost_silent 0.00
 """
 
 from __future__ import annotations
@@ -48,8 +49,11 @@ ACTIONS = ["Explain", "Update", "Silent"]
 S_IDX = {s: i for i, s in enumerate(SITUATIONS)}
 A_IDX = {a: i for i, a in enumerate(ACTIONS)}
 
-# Communication costs (as discussed)
-ACTION_COST = np.array([0.15, 0.05, 0.00], dtype=float)  # Explain, Update, Silent
+# Communication costs
+# ACTION_COST = np.array([0.15, 0.05, 0.00], dtype=float)  # Explain, Update, Silent
+# Default communication costs
+DEFAULT_ACTION_COST = np.array([0.15, 0.05, 0.00], dtype=float)  # Explain, Update, Silent
+ACTION_COST = DEFAULT_ACTION_COST.copy()
 
 POLICY_DISPLAY = {
     "always_explain": "Always Explain",
@@ -363,56 +367,19 @@ def plot_mean_std_seaborn(
     plt.close()
 
 
-def plot_belief_convergence_example(
-    trace: RunTrace,
-    s_name: str,
-    a_name: str,
-    theta_true: float,
-    outpath_pdf: str,
-) -> None:
-
-    s = S_IDX[s_name]
-    a = A_IDX[a_name]
-
-    T = trace.alpha_hist.shape[0]
-    posterior_mean = trace.alpha_hist[:, s, a] / (
-        trace.alpha_hist[:, s, a] + trace.beta_hist[:, s, a]
-    )
-
-    df = pd.DataFrame({
-        "step": np.arange(T),
-        "Posterior mean": posterior_mean
-    })
-
-    plt.figure()
-
-    ax = sns.lineplot(
-        data=df,
-        x="step",
-        y="Posterior mean",
-        linewidth=2.0
-    )
-
-    # True theta reference line
-    ax.axhline(
-        theta_true,
-        linestyle="--",
-        linewidth=2.0,
-        label="True acceptance probability"
-    )
-
-    ax.set_xlabel("Interaction step")
-    ax.set_ylabel("Acceptance probability")
-
-    # Clean legend
-    leg = ax.legend()
-    if leg is not None:
-        leg.set_title("")
-
-    sns.despine()
-    plt.tight_layout()
-    plt.savefig(outpath_pdf)
-    plt.close()
+def save_run_metadata(filepath: str, args: argparse.Namespace) -> None:
+    with open(filepath, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["parameter", "value"])
+        w.writerow(["T", args.T])
+        w.writerow(["runs", args.runs])
+        w.writerow(["seed", args.seed])
+        w.writerow(["cost_explain", args.cost_explain])
+        w.writerow(["cost_update", args.cost_update])
+        w.writerow(["cost_silent", args.cost_silent])
+        w.writerow(["switch_prob", args.switch_prob])
+        w.writerow(["switch_mode", args.switch_mode])
+        w.writerow(["dynamic_pair", args.dynamic_pair])
 
 
 def main() -> None:
@@ -429,14 +396,28 @@ def main() -> None:
                     help="how to switch between models: toggle (0<->1) or random")
     parser.add_argument("--dynamic_pair", type=str, default="Type1_ExplanationOriented+Type2_Minimalist",
                     help="two user types to switch between, e.g., Type1_ExplanationOriented+Type2_Minimalist")
+    parser.add_argument("--cost_explain", type=float, default=0.15,
+                        help="communication cost for Explain")
+    parser.add_argument("--cost_update", type=float, default=0.05,
+                        help="communication cost for Update")
+    parser.add_argument("--cost_silent", type=float, default=0.00,
+                        help="communication cost for Silent")
     
     args = parser.parse_args()
+
+    global ACTION_COST
+    ACTION_COST = np.array(
+        [args.cost_explain, args.cost_update, args.cost_silent],
+        dtype=float
+    )
 
     outdir = args.outdir
     figdir = os.path.join(outdir, "figures")
     resdir = os.path.join(outdir, "results")
     ensure_dir(figdir)
     ensure_dir(resdir)
+
+    save_run_metadata(os.path.join(outdir, "run_metadata.csv"), args)
 
     user_types = make_user_types()
 
@@ -529,18 +510,6 @@ def main() -> None:
             title=None,
             legend_title=None,
             outpath_pdf=os.path.join(figdir, f"{user.name}_cumregret.pdf"),
-        )
-
-    # Belief convergence example (Type3, Failure–Explain)
-    if example_trace is not None and example_trace.alpha_hist.shape[0] > 0:
-        user3 = [u for u in user_types if u.name == "Type3_SituationSensitive"][0]
-        theta_true = float(user3.theta[S_IDX["Failure"], A_IDX["Explain"]])
-        plot_belief_convergence_example(
-            example_trace,
-            s_name="Failure",
-            a_name="Explain",
-            theta_true=theta_true,
-            outpath_pdf=os.path.join(figdir, "Type3_belief_convergence_Failure_Explain.pdf"),
         )
 
     print(f"Done. Outputs written to: {outdir}/")
