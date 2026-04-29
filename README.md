@@ -151,8 +151,6 @@ If you use this repository, please cite the corresponding ICSR 2026 paper:
 }
 ```
 
-Please update the BibTeX entry with the final author list, proceedings details, publisher, pages, and DOI once they are available.
-
 ## License
 
 Code is released under the MIT License. Paper-related materials are released under CC BY-NC-ND 4.0, unless otherwise stated.
