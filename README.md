@@ -155,4 +155,4 @@ Please update the BibTeX entry with the final author list, proceedings details, 
 
 ## License
 
-No license file is currently included. Before making the repository public, add an explicit license, for example MIT, BSD-3-Clause, or another license appropriate for the code and study materials.
+Code is released under the MIT License. Paper-related materials are released under CC BY-NC-ND 4.0, unless otherwise stated.
